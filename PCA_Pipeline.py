@@ -58,7 +58,122 @@ def Lang_Analysis(boxcar, hilb_type):
 
 
 #Full Pipeline of Analysis for 1 Subject for all frequency bands. 
+"""
+         x   y
+Gamma -> 30,45
+Beta -> 13, 25
+Alpha  -> 8,12
+Theta -> 4, 7
+All -> 2 , 50
 
+"""
+
+
+def find_bands():
+    
+    Subjects = ['Subject 1', 'Subject 2', 'Subject 3', 'Subject 4']
+    Best = [[], []], [[], []], [[], []], [[], []]
+    
+    for k,v in enumerate(Subjects):
+        if v == 'Subject 2':
+            Best[k][:] = Band_Selection(v, 'Right')
+        else:
+            Best[k][:] = Band_Selection(v, 'Left')
+            
+    f, axes = plt.subplots(2,2)
+    axes[0,0].set_title('Subject 1')    
+    axes[0,0].plot(Best[0][1][0])
+    axes[0,0].plot(Best[0][1][1])
+    axes[0,0].text(0.68, 0.7, Best[0][0])
+    
+    
+    axes[0,1].set_title('Subject 2')
+    axes[0,0].plot(Best[1][1][0])
+    axes[0,0].plot(Best[1][1][1])
+    axes[0,0].text(0.68, 0.7, Best[1][0])
+    axes[0,1].legend(('Left', 'Right'),
+           loc='upper right')
+    
+    axes[1,0].set_title('Subject 3')
+    axes[0,0].plot(Best[2][1][0])
+    axes[0,0].plot(Best[2][1][1])
+    axes[0,0].text(0.68, 0.7, Best[2][0])
+    
+    
+    axes[1,1].set_title('Subject 4')
+    axes[0,0].plot(Best[3][1][0])
+    axes[0,0].plot(Best[3][1][1])
+    axes[0,0].text(0.68, 0.7, Best[3][0])
+    
+    plt.show()
+    
+    
+    return(Best)        
+        
+            
+
+def Band_Selection(Subject, Side):
+    old = 0
+    freq = {'alpha':(8,12), 'beta': (13, 25), 'gamma':(30, 45), 'theta': (4,7)}
+    for i, v in enumerate(freq):
+        for j,q in enumerate(freq):
+            if v != q:
+                Bands = [v, q]
+                L,R = concatenate(Bands, Subject)
+                if Side == 'Left':
+                    if (np.mean(L) - np.mean(R)) > old:
+                        bestBand = Bands
+                        old = (np.mean(L) - np.mean(R))
+                        bestScores = L,R
+                if Side == 'Right':
+                    if(np.mean(R) - np.mean(L)) > old:
+                        bestBand = Bands
+                        old = (np.mean(L) - np.mean(R))
+                        bestScores = L,R
+                        
+    best = [bestBand, bestScores]  
+    return(best)                
+
+
+
+
+
+
+
+
+
+def concatenate(Bands, Subject):
+    freq = {'alpha':(8,12), 'beta': (13, 25), 'gamma':(30, 45), 'theta': (4,7)}
+    for i,v in enumerate(Bands):
+        high, low = freq[v]
+        data, labels = FilterFreq(high, low, Subject)
+        [Left, Right, labels_data] = PCA_score(data, labels, 20, 'amp')
+        L = np.zeros_like(Left)
+        R = np.zeros_like(Right)
+        L = np.concatenate((L, Left), 1)
+        R = np.concatenate((R,Right), 1)
+    
+    
+    labels_data = np.concatenate((labels_data, labels_data), 0)
+    L1 = L[:,3:6,:]
+    L2 = L[:,6:9,:]
+    R1 = R[:,3:6,:]
+    R2 = R[:,6:9,:]
+    labels_data = labels_data[0]
+    labels_data = labels_data, labels_data
+    L3 = np.concatenate((L1,L2), 1)
+    R3 = np.concatenate((R1,R2), 1)
+    LScore, RScore = SVM(L3, R3, labels_data)
+    
+        
+    return(LScore, RScore)
+    
+        
+    
+        
+        
+
+        
 
 def Analysis(Subject, boxcar, hilb_type):
     Alpha, Labels = FilterFreq(8,12, Subject)
@@ -137,9 +252,7 @@ def postAnalysis(LangAnalysis):
     
     plt.show()
     
-    g = plt.figure(2)
-    plt.bar()
-    
+
     return()
     
 
@@ -149,15 +262,7 @@ def postAnalysis(LangAnalysis):
 # Filter program, type in subject, and what frequencies you want, and will give you
 # Epoched data and its Labels in Data variable and Labels Variable
 
-"""
-         x   y
-Gamma -> 30,45
-Beta -> 13, 25
-Alpha  -> 8,12
-Theta -> 4, 7
-All -> 2 , 50
 
-"""
 # Filter bands for your convenience 
 
 def FilterFreq(Low,High, Subject):
@@ -272,9 +377,10 @@ def PCA_score(Beta, Labels, boxcar, hilb_type):
     
     
     
-#        return(pca_L, pca_RR, labels_data)
-#    
-#    def SVM(pca_L, pca_RR, labels_data):
+    return(pca_L, pca_RR, labels_data)
+
+
+def SVM(pca_L, pca_RR, labels_data):
     
 
     from sklearn.svm import SVC  # noqa
@@ -587,7 +693,7 @@ def Epochs(HilbL, eventsLH, rawLH, Picks, infoRaw):
 
 
 
-Scores = Lang_Analysis(20, 'amp')
+#Scores = Lang_Analysis(20, 'amp')
 
 
 
