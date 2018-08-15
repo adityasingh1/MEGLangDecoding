@@ -22,6 +22,9 @@ Created on Wed Jul 11 11:27:35 2018
 # This line can also be found at the bottom of the script so if you uncomment it 
 # And save, you can just run the file, and it will do everything for you. 
 
+#If you want to look at specific bands, define those bands in band selection 
+# in the frequency variable, and then run find_bands() and you will get a graph 
+# of all four subjects with the best bands concantenated for the correct hemisphere
 
 # Run and change variables, processing methods, until all bands match up in graph
 # With decent separation in accuracy. 
@@ -88,22 +91,22 @@ def find_bands():
     
     
     axes[0,1].set_title('Subject 2')
-    axes[0,0].plot(Best[1][1][0])
-    axes[0,0].plot(Best[1][1][1])
-    axes[0,0].text(0.68, 0.7, Best[1][0])
+    axes[0,1].plot(Best[1][1][0])
+    axes[0,1].plot(Best[1][1][1])
+    axes[0,1].text(0.68, 0.7, Best[1][0])
     axes[0,1].legend(('Left', 'Right'),
            loc='upper right')
     
     axes[1,0].set_title('Subject 3')
-    axes[0,0].plot(Best[2][1][0])
-    axes[0,0].plot(Best[2][1][1])
-    axes[0,0].text(0.68, 0.7, Best[2][0])
+    axes[1,0].plot(Best[2][1][0])
+    axes[1,0].plot(Best[2][1][1])
+    axes[1,0].text(0.5, 0.5, Best[2][0])
     
     
     axes[1,1].set_title('Subject 4')
-    axes[0,0].plot(Best[3][1][0])
-    axes[0,0].plot(Best[3][1][1])
-    axes[0,0].text(0.68, 0.7, Best[3][0])
+    axes[1,1].plot(Best[3][1][0])
+    axes[1,1].plot(Best[3][1][1])
+    axes[1,1].text(0.68, 0.7, Best[3][0])
     
     plt.show()
     
@@ -114,10 +117,11 @@ def find_bands():
 
 def Band_Selection(Subject, Side):
     old = 0
-    freq = {'alpha':(8,12), 'beta': (13, 25), 'gamma':(30, 45), 'theta': (4,7)}
+    freq = {'gamma':(30, 45), 'theta': (4,7)}
     for i, v in enumerate(freq):
         for j,q in enumerate(freq):
             if v != q:
+                print(v,q)
                 Bands = [v, q]
                 L,R = concatenate(Bands, Subject)
                 if Side == 'Left':
@@ -147,22 +151,22 @@ def concatenate(Bands, Subject):
     for i,v in enumerate(Bands):
         high, low = freq[v]
         data, labels = FilterFreq(high, low, Subject)
-        [Left, Right, labels_data] = PCA_score(data, labels, 20, 'amp')
+        Left, Right, labels_data = PCA_score(data, labels, 20, 'amp')
         L = np.zeros_like(Left)
         R = np.zeros_like(Right)
-        L = np.concatenate((L, Left), 1)
-        R = np.concatenate((R,Right), 1)
+        L = np.concatenate((L, Left), 2)
+        R = np.concatenate((R,Right), 2)
     
     
     labels_data = np.concatenate((labels_data, labels_data), 0)
-    L1 = L[:,3:6,:]
-    L2 = L[:,6:9,:]
-    R1 = R[:,3:6,:]
-    R2 = R[:,6:9,:]
+    L1 = L[:,:,1101:2202]
+    L2 = L[:,:,2202:3303]
+    R1 = R[:,:,1101:2202]
+    R2 = R[:,:,2202:3303]
     labels_data = labels_data[0]
     labels_data = labels_data, labels_data
-    L3 = np.concatenate((L1,L2), 1)
-    R3 = np.concatenate((R1,R2), 1)
+    L3 = np.concatenate((L1,L2), 2)
+    R3 = np.concatenate((R1,R2), 2)
     LScore, RScore = SVM(L3, R3, labels_data)
     
         
@@ -329,8 +333,8 @@ def PCA_score(Beta, Labels, boxcar, hilb_type):
                     if k<N:
                         fdata[i,q,k] = data[i,q,k]
                     else:
-#                        fdata[i,q,k] = np.sqrt(np.mean(data[i,q,(k-(N-1)):(k+1)] ** 2))
-                      fdata[i,q,k] = (np.mean(data[i,q,(k-(N-1)):(k+1)]))
+                        fdata[i,q,k] = np.sqrt(np.mean(data[i,q,(k-(N-1)):(k+1)] ** 2))
+#                      fdata[i,q,k] = (np.mean(data[i,q,(k-(N-1)):(k+1)]))
 
                         # depending on if you want to use RMS vs just mean, 
                         #try out with both, see what works better for you
@@ -376,10 +380,9 @@ def PCA_score(Beta, Labels, boxcar, hilb_type):
     pca_L = Boxcar(pca_L, boxcar)
     
     
-    
     return(pca_L, pca_RR, labels_data)
-
-
+#
+#
 def SVM(pca_L, pca_RR, labels_data):
     
 
@@ -387,12 +390,24 @@ def SVM(pca_L, pca_RR, labels_data):
     from sklearn.model_selection import ShuffleSplit  # noqa
     from sklearn.model_selection import cross_val_score
     from sklearn.pipeline import make_pipeline
+    from sklearn.ensemble import RandomForestClassifier
+    from sklearn.svm import LinearSVC
+    # Apply different classifiers to test out results very easily 
+    # by just defining it here, and adding  it to the pipeline after the CSP filter
+    
+    forest_clf = RandomForestClassifier(random_state = 42)
+    linear_svc = LinearSVC(random_state = 42)
 
     # Applies CSP before applying SVC for better results, point of investigation for 
     # obtaining better accuracies 
+    
     from mne.decoding import CSP  # noqa
-    clf = make_pipeline(CSP(n_components=4, reg='ledoit_wolf', log=True, norm_trace=False),
-                        SVC(C=1, kernel = 'linear'))
+    clf = make_pipeline(CSP(n_components=4, reg='oas', log=True, norm_trace=False), linear_svc)
+                        #SVC(C=1, kernel = 'linear'))
+    
+    
+#    forest_scores = cross_val_score(forest_clf, X_train, y_train, cv = 10)
+#    forest_scores.mean()
 
 
 
